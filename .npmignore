@@ -1,0 +1,10 @@
+src/
+tsconfig.json
+.github/
+docs/
+*.log
+.env*
+node_modules/
+dist/**/*.test.js
+dist/**/*.test.d.ts
+dist/**/*.test.js.map

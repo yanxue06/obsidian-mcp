@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Local REST API plugin issues
+    url: https://github.com/coddingtonbear/obsidian-local-rest-api/issues
+    about: If the bug is in the Obsidian plugin layer, report it upstream.
+  - name: Model Context Protocol docs
+    url: https://modelcontextprotocol.io
+    about: Questions about the MCP protocol itself.

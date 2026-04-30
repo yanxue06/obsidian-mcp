@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.env
+.env.local
+.vscode/
+.idea/
+coverage/
+*.tgz
+
+# Hidden from the public repo (kept locally for reference)
+CHANGELOG.md
+docs/

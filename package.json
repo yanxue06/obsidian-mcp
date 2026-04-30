@@ -1,0 +1,65 @@
+{
+  "name": "obsidian-mcp",
+  "version": "0.1.0",
+  "description": "Give Claude (and any MCP client) real agent access to your Obsidian vault — graph traversal, Dataview queries, daily-note awareness, and more.",
+  "keywords": [
+    "obsidian",
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "anthropic",
+    "knowledge-graph",
+    "pkm",
+    "second-brain",
+    "ai",
+    "llm",
+    "cursor",
+    "cline",
+    "agent"
+  ],
+  "homepage": "https://github.com/yanxue06/obsidian-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/yanxue06/obsidian-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yanxue06/obsidian-mcp.git"
+  },
+  "license": "MIT",
+  "author": "Yan Xue",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "obsidian-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build && npm test",
+    "lint": "tsc --noEmit",
+    "test": "tsc && node --test dist/graph.test.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "undici": "^6.21.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
