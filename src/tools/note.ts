@@ -351,7 +351,8 @@ function renderYaml(obj: Record<string, unknown>): string {
   // Keep this dependency-free; we only need a small subset of YAML.
   const lines: string[] = [];
   for (const [k, v] of Object.entries(obj)) {
-    lines.push(`${k}: ${formatYamlValue(v)}`);
+    const value = formatYamlValue(v);
+    lines.push(value.startsWith("\n") ? `${k}:${value}` : `${k}: ${value}`);
   }
   return lines.join("\n") + "\n";
 }
