@@ -6,7 +6,7 @@
 
 ### Treat your Obsidian vault as a knowledge graph that AI agents can actually use.
 
-A [Model Context Protocol](https://modelcontextprotocol.io) server that gives Claude — and any other MCP-compatible AI — graph-aware access to your notes. Backlinks, multi-hop traversal, Dataview queries, daily-note awareness, and safe rename-with-backlink-rewrite, all in 23 typed tools.
+A [Model Context Protocol](https://modelcontextprotocol.io) server that gives Claude — and any other MCP-compatible AI — graph-aware access to your notes. Backlinks, multi-hop traversal, Dataview queries, daily-note awareness, batch note creation, and safe rename-with-backlink-rewrite, exposed as 25 typed tools.
 
 [![npm version](https://img.shields.io/npm/v/obsidian-mcp.svg?style=flat-square&color=cb3837)](https://www.npmjs.com/package/obsidian-mcp)
 [![CI](https://img.shields.io/github/actions/workflow/status/yanxue06/obsidian-mcp/ci.yml?style=flat-square&label=CI)](https://github.com/yanxue06/obsidian-mcp/actions)
@@ -15,24 +15,25 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that gives Cl
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square)](tsconfig.json)
 [![GitHub stars](https://img.shields.io/github/stars/yanxue06/obsidian-mcp?style=flat-square)](https://github.com/yanxue06/obsidian-mcp/stargazers)
 
-[**Setup**](#setup) · [**What you can do**](#what-you-can-do-with-it) · [**Tools**](#tool-catalog) · [**Design notes**](#design-notes) · [**FAQ**](#faq)
+[**Setup**](#setup) · [**What you can do**](#what-you-can-do-with-it) · [**Tools**](#tool-catalog) · [**Configuration**](#configuration) · [**FAQ**](#faq)
 
 </div>
 
 ---
 
-## Pitch
+## Why this exists
 
 Most "Obsidian + AI" integrations expose `read_file` and `write_file`, then ask the model to figure out the rest. That works for a five-note vault. It collapses on a 5,000-note vault the moment you ask anything graph-shaped — *"what connects these two ideas?"*, *"what have I forgotten to follow up on?"*, *"reorganize this folder."* Each question becomes a chain of dozens of `read_file` calls, blowing through your context window before the model has even started thinking.
 
-`obsidian-mcp` solves that by exposing **the graph itself** as tools:
+`obsidian-mcp` exposes **the graph itself** as tools:
 
 - **`get_note`** returns content + backlinks + forward links + tags + frontmatter in *one* call.
 - **`traverse_graph`** walks N hops out from any starting note in one call — forward, backward, or both — returning nodes and edges as a subgraph.
 - **`query_dataview`** passes Dataview DQL straight through, so the model can ask *"all notes tagged #project where status != done sorted by due date"* as a single typed query.
 - **`move_note`** renames a note **and rewrites every incoming wiki-link** so the graph survives the rename. This unblocks the entire "reorganize my vault" class of prompts that other servers can't safely do.
+- **`create_notes`** creates many notes in a single tool call — useful for bootstrapping an MOC plus its topical notes without paying N round-trips.
 
-It's a small server (TypeScript, ~1,000 LOC, two runtime deps), runs locally over stdio, and works with Claude Desktop, Claude Code, Cursor, Cline, Continue, and Zed.
+It's a small server (TypeScript, ~2,000 LOC, three runtime deps), runs locally over stdio, and works with Claude Desktop, Claude Code, Cursor, Cline, Continue, and Zed.
 
 ## What you can do with it
 
@@ -45,6 +46,8 @@ Real prompts you can drop into Claude Desktop after installing:
 > **Daily review.** *What's in my daily note today? Anything I forgot to follow up on from yesterday's note? Append my action items to today.*
 
 > **Inbox triage.** *Find all my orphan notes in `Inbox/`. For each one, read it, suggest where it belongs, and ask me before moving anything.*
+
+> **Bootstrap a topic.** *I just started studying transformer architectures. Use `create_notes` to scaffold a `MOCs/Transformers MOC.md` plus stub notes for "Self-attention", "Multi-head attention", "Positional encoding", and "Layer normalization", each linking back to the MOC.*
 
 > **Safe refactor.** *Rename "Atomic notes.md" to "Evergreen notes.md" using `move_note`. Update every backlink so nothing breaks.*
 
@@ -66,7 +69,8 @@ You need three things wired up: Obsidian running, the Local REST API plugin enab
 2. Search for **Local REST API**, then **Install** and **Enable** it.
 3. Open the plugin's settings tab. Copy the **API key** shown at the top — you'll paste it into your MCP client config in Step 2.
 
-> **Heads up:** Obsidian must be running for `obsidian-mcp` to work. The plugin lives *inside* Obsidian; close the app and the server can't reach your vault.
+> [!IMPORTANT]
+> Obsidian must be running for `obsidian-mcp` to work. The plugin lives *inside* Obsidian; close the app and the server can't reach your vault.
 
 ### Step 2 — Add `obsidian-mcp` to your MCP client
 
@@ -145,22 +149,9 @@ If you get a number back, you're done. If you hit a connection error, check [tro
 | `Failed to reconnect to obsidian` after editing config | Fully quit and reopen the MCP client; in-place reconnect doesn't always re-spawn the child process. |
 | Wrong vault is showing up | One server instance points at one running Obsidian instance. Switch vaults inside Obsidian, or register multiple MCP entries with different names. |
 
-### From source (contributors only)
-
-If you want to hack on the server itself rather than just use it:
-
-```bash
-git clone https://github.com/yanxue06/obsidian-mcp.git
-cd obsidian-mcp
-npm install
-npm test          # 15 tests pass
-npm run build
-OBSIDIAN_API_KEY=... node dist/index.js
-```
-
 ## Tool catalog
 
-23 tools, organized by category. **Bold** rows are the differentiators that other Obsidian MCP servers don't expose.
+25 tools, organized by category. **Bold** rows are the differentiators that other Obsidian MCP servers don't expose.
 
 ### Discovery — find what's in the vault
 | Tool | What it does |
@@ -191,6 +182,8 @@ OBSIDIAN_API_KEY=... node dist/index.js
 | Tool | What it does |
 | --- | --- |
 | `create_note` | New note with optional frontmatter and an auto-generated `## Related` section of `[[wiki-links]]`. |
+| **`create_notes`** | Create many notes in a single call. Per-note errors are reported individually; pass `stop_on_error: true` to abort on the first failure. Pre-fetches the file listing once for the whole batch. |
+| **`upsert_note`** | Idempotent create-or-update. Replaces body, with optional `merge_frontmatter` to keep existing keys not specified in this call. |
 | `update_note` | Replace a note's full content. |
 | `append_to_note` | Append markdown to the end of a note. |
 | `append_to_daily_note` | Common pattern: agent logs what it did to today's daily. |
@@ -205,23 +198,6 @@ OBSIDIAN_API_KEY=... node dist/index.js
 | `list_commands` | List every registered Obsidian command (built-in + plugin). |
 | **`run_command`** | Execute any Obsidian command by id. Lets agents trigger any plugin action. |
 
-## How it compares
-
-| | obsidian-mcp | Other Obsidian MCP servers | Obsidian Copilot (plugin) |
-| --- | --- | --- | --- |
-| Backlinks in one call | yes | no | yes |
-| Multi-hop graph traversal | **yes** | no | no |
-| Dataview DQL passthrough | **yes** | no | partial |
-| Daily / periodic notes | yes | no | no |
-| Patch under heading / block | yes | no | no |
-| Move with backlink rewrite | **yes** | no | no |
-| Run Obsidian commands | **yes** | no | no |
-| Vault stats + tag inventory | **yes** | no | no |
-| Find orphans / broken links | yes | no | no |
-| Works with any MCP client | yes | yes | no (Obsidian-only) |
-| Requires extra Obsidian plugins | Local REST API only | Local REST API only | yes |
-| Lines of runtime code | ~1,000 | ~200–400 | ~10,000+ |
-
 ## How it works
 
 ```
@@ -231,27 +207,9 @@ OBSIDIAN_API_KEY=... node dist/index.js
 └──────────────────┘                   └──────────────┘              └──────────────────┘
 ```
 
-`obsidian-mcp` is a thin layer over the [Local REST API plugin](https://github.com/coddingtonbear/obsidian-local-rest-api). The plugin runs an HTTPS server inside Obsidian with full vault access; this server adapts that surface into the MCP protocol and adds graph-aware tools that Obsidian's REST API doesn't expose directly (backlinks, multi-hop traversal, orphan detection, safe rename).
+`obsidian-mcp` is a thin layer over the [Local REST API plugin](https://github.com/coddingtonbear/obsidian-local-rest-api). The plugin runs an HTTPS server inside Obsidian with full vault access; this server adapts that surface into the MCP protocol and adds graph-aware tools that Obsidian's REST API doesn't expose directly (backlinks, multi-hop traversal, orphan detection, safe rename, batch creation).
 
 Everything is local. No data leaves your machine except the requests your MCP client makes to its model provider — and you control that.
-
-## Design notes
-
-A few of the trade-offs worth calling out, for anyone reading the code or evaluating the approach.
-
-**Why ride on the Local REST API plugin instead of an Obsidian plugin of our own?** Two reasons. (1) An MCP server has to be a separate process — the protocol expects a stdio child process, not an in-process module. So even if we wrote a plugin, it would still need a sidecar. (2) The Local REST API plugin already exists, is maintained, has a clean HTTP surface, and handles auth and TLS. Reusing it means zero install friction for users who already have it, and a 60-second setup for those who don't.
-
-**Why a separate `get_note` shape with `include` instead of always returning everything?** Backlinks are O(vault size) — for a 5k-note vault, computing them naively is hundreds of search hits. The default `include` set (`content`, `forward_links`, `tags`, `frontmatter`) is cheap; `backlinks` is opt-in. This puts cost control in the model's hands without making the simple case verbose.
-
-**Why a 30-second TTL cache on `listVault`?** Every link resolution and graph walk needs the canonical file list. A multi-step agent prompt might call 5–10 tools in sequence; without caching, each one re-fetches the whole vault listing from Obsidian. With it, a chain of tool calls amortizes onto one HTTP round-trip.
-
-**Why does `move_note` rewrite backlinks?** Because LLMs almost always *think* they should rename, then break the graph and not notice. Making the safe path the default — and the unsafe path a `update_backlinks: false` opt-out — turns a footgun into a noop. We resolve each candidate link in the *pre-move* file list before rewriting, to avoid clobbering links that happened to share a basename.
-
-**Why no embeddings / semantic search?** Embeddings would be useful, but they require a vector store, an embedding pipeline, and incremental indexing — meaningful complexity that pulls a single-file-server into a stateful system. The plugin's full-text search covers the common case; embeddings would be a meaningful next step once first-pass user feedback is in.
-
-**Why Zod schemas instead of hand-written JSON Schema?** Two-way type inference. The handler's `input` parameter is automatically typed from the schema, so refactors that change a tool's input shape produce compile errors at the call site, not runtime errors at tool-call time. The MCP SDK lowers Zod to JSON Schema for clients automatically.
-
-**What's *not* there.** No write-locking — if two agents move the same file simultaneously, the loser's change is lost. No transaction semantics — `move_note`'s "delete source" step happens after the backlink rewrite, so a crash mid-operation can leave the destination written but the source un-deleted. Both are acceptable for an interactive agent tool but would not be acceptable for an unattended batch job.
 
 ## Configuration
 
@@ -288,7 +246,13 @@ All config is via environment variables — set them in your MCP client config.
 
 **Is this safe?** The MCP server gives the model whatever access the API key grants — including delete and overwrite. Treat it like any agent with file write access: review what it's about to do, especially before bulk operations. `move_note` is designed for exactly this — making the safe path the default.
 
+**What about concurrency and crashes?** No write-locking and no transaction semantics. If two agents touch the same file simultaneously, the loser's change is lost. `move_note` deletes the source after rewriting backlinks, and `create_notes` is best-effort per entry, so a crash mid-operation can leave partial state. Fine for interactive agent use; not appropriate for unattended batch jobs.
+
 **How do I debug?** Run `node dist/index.js` directly with your env vars and the server prints connection status to stderr. Send JSON-RPC messages on stdin to test. The MCP Inspector ([npm](https://www.npmjs.com/package/@modelcontextprotocol/inspector)) is the easiest way to poke at tools manually.
+
+## Contributing
+
+PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev loop, tool-authoring conventions, and code-style expectations.
 
 ## Acknowledgements
 
