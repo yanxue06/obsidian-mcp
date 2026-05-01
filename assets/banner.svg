@@ -48,6 +48,6 @@
     <text x="72" y="138" font-size="68" font-weight="700" fill="url(#textGrad)">obsidian-mcp</text>
     <text x="74" y="184" font-size="22" font-weight="500" fill="#c4b5fd">Your Obsidian vault as a knowledge graph,</text>
     <text x="74" y="214" font-size="22" font-weight="500" fill="#c4b5fd">queryable by any MCP-compatible AI.</text>
-    <text x="74" y="266" font-size="13" fill="#9b8fd1" letter-spacing="3">23 TOOLS · GRAPH-AWARE · LOCAL-FIRST</text>
+    <text x="74" y="266" font-size="13" fill="#9b8fd1" letter-spacing="3">25 TOOLS · GRAPH-AWARE · LOCAL-FIRST</text>
   </g>
 </svg>
