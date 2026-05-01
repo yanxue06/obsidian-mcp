@@ -21,7 +21,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that gives Cl
 
 ---
 
-## The 30-second pitch
+## Pitch
 
 Most "Obsidian + AI" integrations expose `read_file` and `write_file`, then ask the model to figure out the rest. That works for a five-note vault. It collapses on a 5,000-note vault the moment you ask anything graph-shaped — *"what connects these two ideas?"*, *"what have I forgotten to follow up on?"*, *"reorganize this folder."* Each question becomes a chain of dozens of `read_file` calls, blowing through your context window before the model has even started thinking.
 
