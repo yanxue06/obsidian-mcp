@@ -7,9 +7,11 @@ import {
 import {
   appendNoteTool,
   createNoteTool,
+  createNotesTool,
   getNoteTool,
   patchNoteTool,
   updateNoteTool,
+  upsertNoteTool,
 } from "./note.js";
 import {
   findOrphansTool,
@@ -48,6 +50,8 @@ export const allTools: AnyToolDef[] = [
   findBrokenLinksTool,
   // writing
   createNoteTool,
+  createNotesTool,
+  upsertNoteTool,
   updateNoteTool,
   appendNoteTool,
   appendDailyNoteTool,

@@ -44,7 +44,7 @@
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build && npm test",
     "lint": "tsc --noEmit",
-    "test": "tsc && node --test dist/graph.test.js",
+    "test": "tsc && node --test dist/graph.test.js dist/tools/note.test.js",
     "clean": "rm -rf dist"
   },
   "dependencies": {
