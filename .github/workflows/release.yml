@@ -1,29 +1,30 @@
+# Release pipeline — calls BuildSpace's reusable typescript-service-release
+# workflow. Trigger model: merge a PR carrying the `release` label, and the
+# reusable workflow handles version bump, GitHub Release, and npm publish.
+#
+# Required repo secrets:
+#   - OPENAI_API_KEY  (AI versioning + release notes)
+#   - NPM_TOKEN       (npm publish)
+#
+# To do a one-off prerelease, label the PR `prerelease` instead of `release`.
+# To smoke-test without publishing, temporarily add `dry-run: true` under
+# `with:` below.
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
+  release:
+    uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@v1
+    with:
+      service-name: obsidian-mcp
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
