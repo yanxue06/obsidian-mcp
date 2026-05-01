@@ -1,6 +1,6 @@
 {
   "name": "obsidian-mcp",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Give Claude (and any MCP client) real agent access to your Obsidian vault — graph traversal, Dataview queries, daily-note awareness, and more.",
   "keywords": [
     "obsidian",
