@@ -12,8 +12,8 @@
 name: Release
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled, closed]
+  push:
+    branches: [main]
 
 permissions:
   contents: write
