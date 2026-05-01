@@ -67,6 +67,7 @@ export const getNoteTool = defineTool({
       const target = basename(note.path).replace(/\.md$/i, "");
       // Plain-text scan covers wiki-links by basename or path. Falls back to
       // the simple search endpoint, which is indexed.
+      void all;
       const hits = await client.simpleSearch(`[[${target}`, 80);
       out.backlinks = hits
         .filter((h) => h.filename !== note.path)
@@ -81,26 +82,32 @@ export const getNoteTool = defineTool({
   },
 });
 
+// Shared schema for create_note / create_notes / upsert_note (writes that
+// produce a fresh body from frontmatter + content + optional links section).
+const noteWriteSchema = z.object({
+  path: z
+    .string()
+    .describe("Vault-relative path. '.md' is appended if missing."),
+  content: z.string().default("").describe("Markdown body."),
+  frontmatter: z
+    .record(z.unknown())
+    .optional()
+    .describe("YAML frontmatter as a JSON object."),
+  links: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Optional list of note titles to render as `[[wiki-links]]` at the end.",
+    ),
+  overwrite: z.boolean().default(false),
+});
+
 export const createNoteTool = defineTool({
   name: "create_note",
   title: "Create a note",
   description:
-    "Create a new note (fails if it already exists unless `overwrite` is true). Frontmatter is rendered as YAML. Use `links` to append a wiki-link section at the end.",
-  inputSchema: z.object({
-    path: z.string().describe("Vault-relative path. '.md' is appended if missing."),
-    content: z.string().default("").describe("Markdown body."),
-    frontmatter: z
-      .record(z.unknown())
-      .optional()
-      .describe("YAML frontmatter as a JSON object."),
-    links: z
-      .array(z.string())
-      .optional()
-      .describe(
-        "Optional list of note titles to render as `[[wiki-links]]` at the end.",
-      ),
-    overwrite: z.boolean().default(false),
-  }),
+    "Create a new note (fails if it already exists unless `overwrite` is true). Frontmatter is rendered as YAML. Use `links` to append a wiki-link section at the end. For creating many notes in one call, use `create_notes`. For idempotent create-or-update writes, use `upsert_note`.",
+  inputSchema: noteWriteSchema,
   async handler(
     { path, content, frontmatter, links, overwrite },
     { client },
@@ -116,19 +123,147 @@ export const createNoteTool = defineTool({
       }
     }
 
-    let body = "";
-    if (frontmatter && Object.keys(frontmatter).length > 0) {
-      body += "---\n" + renderYaml(frontmatter) + "---\n\n";
-    }
-    body += content;
-    if (links && links.length > 0) {
-      body += "\n\n## Related\n";
-      for (const l of links) body += `- [[${l}]]\n`;
-    }
-
+    const body = buildNoteBody({ content, frontmatter, links });
     await client.putNote(finalPath, body);
     invalidateFileCache();
     return { ok: true, path: finalPath, bytes: Buffer.byteLength(body) };
+  },
+});
+
+export const createNotesTool = defineTool({
+  name: "create_notes",
+  title: "Create multiple notes in one call",
+  description:
+    "Create many notes in a single tool call. Designed for bootstrapping a knowledge graph (MOC + topical notes) without paying N round-trips. Each entry follows the same schema as `create_note`. Per-note errors are reported individually; pass `stop_on_error: true` to abort on the first failure. Within a batch, later entries also fail if they target a path already created earlier in the same call.",
+  inputSchema: z.object({
+    notes: z
+      .array(noteWriteSchema)
+      .min(1)
+      .describe("Notes to create. Each entry has the same fields as create_note."),
+    stop_on_error: z
+      .boolean()
+      .default(false)
+      .describe(
+        "Abort the batch on the first failure. Default: continue and report per-note results.",
+      ),
+  }),
+  async handler({ notes, stop_on_error }, { client }) {
+    const results: Array<{
+      path: string;
+      ok: boolean;
+      bytes?: number;
+      error?: string;
+    }> = [];
+
+    // Pre-fetch the vault listing once for the whole batch. Without this, a
+    // create_notes call with N entries would do N existence-check round-trips.
+    // Copy the cached array so we can append within-batch creations without
+    // mutating the shared cache.
+    const seenFiles = notes.some((n) => !n.overwrite)
+      ? [...(await getAllFiles(client))]
+      : [];
+
+    for (const note of notes) {
+      const finalPath = isMarkdown(note.path) ? note.path : `${note.path}.md`;
+      try {
+        if (!note.overwrite && seenFiles.includes(finalPath)) {
+          throw new Error(
+            `Note already exists: ${finalPath}. Pass overwrite:true to replace.`,
+          );
+        }
+        const body = buildNoteBody({
+          content: note.content,
+          frontmatter: note.frontmatter,
+          links: note.links,
+        });
+        await client.putNote(finalPath, body);
+        results.push({
+          path: finalPath,
+          ok: true,
+          bytes: Buffer.byteLength(body),
+        });
+        seenFiles.push(finalPath);
+      } catch (err) {
+        results.push({
+          path: finalPath,
+          ok: false,
+          error: (err as Error).message,
+        });
+        if (stop_on_error) break;
+      }
+    }
+
+    invalidateFileCache();
+    return {
+      succeeded: results.filter((r) => r.ok).length,
+      failed: results.filter((r) => !r.ok).length,
+      results,
+    };
+  },
+});
+
+export const upsertNoteTool = defineTool({
+  name: "upsert_note",
+  title: "Create or update a note",
+  description:
+    "Create a note if missing, replace it if it exists. Body is always fully replaced. Frontmatter is replaced by default; pass `merge_frontmatter: true` to keep existing frontmatter keys not specified in this call. Use this when you want an idempotent write — neither `create_note` (errors on existence) nor `update_note` (errors when missing) handle that on their own.",
+  inputSchema: z.object({
+    path: z
+      .string()
+      .describe("Vault-relative path. '.md' is appended if missing."),
+    content: z.string().default("").describe("Markdown body."),
+    frontmatter: z
+      .record(z.unknown())
+      .optional()
+      .describe("YAML frontmatter as a JSON object."),
+    links: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Optional list of note titles to render as `[[wiki-links]]` at the end.",
+      ),
+    merge_frontmatter: z
+      .boolean()
+      .default(false)
+      .describe(
+        "If true and the note already exists, merge new frontmatter keys on top of existing ones instead of replacing the block wholesale. Body is always replaced.",
+      ),
+  }),
+  async handler(
+    { path, content, frontmatter, links, merge_frontmatter },
+    { client },
+  ) {
+    const finalPath = isMarkdown(path) ? path : `${path}.md`;
+    const allFiles = await getAllFiles(client);
+    const existed = allFiles.includes(finalPath);
+
+    let effectiveFrontmatter = frontmatter;
+    if (existed && merge_frontmatter && frontmatter) {
+      try {
+        const existing = await client.getNote(finalPath);
+        effectiveFrontmatter = {
+          ...(existing.frontmatter ?? {}),
+          ...frontmatter,
+        };
+      } catch {
+        // If reading the existing frontmatter fails, fall back to the
+        // provided frontmatter as-is — the write below still succeeds.
+      }
+    }
+
+    const body = buildNoteBody({
+      content,
+      frontmatter: effectiveFrontmatter,
+      links,
+    });
+    await client.putNote(finalPath, body);
+    invalidateFileCache();
+    return {
+      ok: true,
+      path: finalPath,
+      created: !existed,
+      bytes: Buffer.byteLength(body),
+    };
   },
 });
 
@@ -195,6 +330,23 @@ export const patchNoteTool = defineTool({
 
 // ---------- helpers ----------
 
+export function buildNoteBody(input: {
+  content?: string;
+  frontmatter?: Record<string, unknown>;
+  links?: string[];
+}): string {
+  let body = "";
+  if (input.frontmatter && Object.keys(input.frontmatter).length > 0) {
+    body += "---\n" + renderYaml(input.frontmatter) + "---\n\n";
+  }
+  body += input.content ?? "";
+  if (input.links && input.links.length > 0) {
+    body += "\n\n## Related\n";
+    for (const l of input.links) body += `- [[${l}]]\n`;
+  }
+  return body;
+}
+
 function renderYaml(obj: Record<string, unknown>): string {
   // Keep this dependency-free; we only need a small subset of YAML.
   const lines: string[] = [];
@@ -217,7 +369,7 @@ function formatYamlValue(v: unknown): string {
 
 function formatYamlScalar(v: unknown): string {
   if (typeof v === "string") {
-    if (/[:#\-?{}\[\],&*!|>'"%@`]/.test(v) || /\n/.test(v)) {
+    if (/[:#\-?{}\[\],&*!|>'\"%@`]/.test(v) || /\n/.test(v)) {
       return JSON.stringify(v);
     }
     return v;
