@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/banner.svg" alt="obsidian-mcp — your Obsidian vault as a knowledge graph, queryable by any MCP-compatible AI" width="100%">
+
 # obsidian-mcp
 
 ### Treat your Obsidian vault as a knowledge graph that AI agents can actually use.
@@ -13,10 +15,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that gives Cl
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square)](tsconfig.json)
 [![GitHub stars](https://img.shields.io/github/stars/yanxue06/obsidian-mcp?style=flat-square)](https://github.com/yanxue06/obsidian-mcp/stargazers)
 
-[**Install**](#install-in-60-seconds) · [**What you can do**](#what-you-can-do-with-it) · [**Tools**](#tool-catalog) · [**Design notes**](#design-notes) · [**FAQ**](#faq)
-
-<!-- TODO: drop a 30s screen recording here. -->
-<!-- ![demo](demo.gif) -->
+[**Setup**](#setup) · [**What you can do**](#what-you-can-do-with-it) · [**Tools**](#tool-catalog) · [**Design notes**](#design-notes) · [**FAQ**](#faq)
 
 </div>
 
@@ -55,13 +54,34 @@ Real prompts you can drop into Claude Desktop after installing:
 
 If a workflow doesn't fit one of the existing tools, [open an issue](https://github.com/yanxue06/obsidian-mcp/issues) — the [tool catalog](#tool-catalog) below covers what's there today.
 
-## Install in 60 seconds
+## Setup
 
-You need **Obsidian** with the **[Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api)** plugin installed and enabled. Copy the API key from its settings — you'll paste it below.
+You need three things wired up: Obsidian running, the Local REST API plugin enabled, and your MCP client pointed at `obsidian-mcp`. The whole flow takes about a minute.
 
-### Claude Desktop
+### Step 1 — Install the Local REST API plugin in Obsidian
 
-Open `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) and add:
+`obsidian-mcp` reaches your vault through the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) community plugin. You only do this once per vault.
+
+1. In Obsidian, open **Settings → Community plugins → Browse**.
+2. Search for **Local REST API**, then **Install** and **Enable** it.
+3. Open the plugin's settings tab. Copy the **API key** shown at the top — you'll paste it into your MCP client config in Step 2.
+
+> **Heads up:** Obsidian must be running for `obsidian-mcp` to work. The plugin lives *inside* Obsidian; close the app and the server can't reach your vault.
+
+### Step 2 — Add `obsidian-mcp` to your MCP client
+
+Pick your client below.
+
+<details open>
+<summary><b>Claude Desktop</b></summary>
+
+Open the config file (create it if it doesn't exist):
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux:** `~/.config/Claude/claude_desktop_config.json`
+
+Add the `obsidian` entry under `mcpServers`:
 
 ```jsonc
 {
@@ -77,19 +97,57 @@ Open `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 }
 ```
 
-Restart Claude Desktop. You should see a tool icon in the chat input — click it to confirm 23 tools are listed.
+Quit and reopen Claude Desktop. You should see a tool icon in the input area — click it to confirm the `obsidian` tools are listed.
 
-### Claude Code
+</details>
+
+<details>
+<summary><b>Claude Code</b></summary>
+
+Run once, from any directory:
 
 ```bash
 claude mcp add obsidian -e OBSIDIAN_API_KEY=paste-your-key-here -- npx -y obsidian-mcp
 ```
 
-### Cursor / Cline / Continue / Zed
+Then fully quit and reopen Claude Code (`/mcp reconnect` doesn't always re-spawn the child process). Verify with `/mcp` — `obsidian` should report **✓ Connected**.
 
-Any MCP client works. Point it at `npx -y obsidian-mcp` with `OBSIDIAN_API_KEY` in the environment.
+</details>
 
-### From source (for development)
+<details>
+<summary><b>Cursor / Cline / Continue / Zed (and other MCP clients)</b></summary>
+
+Add a new stdio MCP server with:
+
+- **Command:** `npx`
+- **Args:** `-y obsidian-mcp`
+- **Env:** `OBSIDIAN_API_KEY=paste-your-key-here`
+
+Refer to your client's MCP config docs for the exact field names. Any MCP-compatible client works.
+
+</details>
+
+### Step 3 — Verify it's wired up
+
+In your MCP client, ask:
+
+> *"Run `get_vault_stats` and tell me how many notes I have."*
+
+If you get a number back, you're done. If you hit a connection error, check [troubleshooting](#troubleshooting) below.
+
+### Troubleshooting
+
+| Symptom | Likely cause / fix |
+| --- | --- |
+| `ECONNREFUSED 127.0.0.1:27124` | Obsidian isn't running, or the Local REST API plugin isn't enabled. |
+| `401 Unauthorized` | Wrong API key. Re-copy it from the plugin's settings tab. |
+| `self signed certificate` warning | Expected — the plugin uses a self-signed cert and `OBSIDIAN_VERIFY_TLS` defaults to `false`. Set it to `true` only if you've replaced the cert. |
+| `Failed to reconnect to obsidian` after editing config | Fully quit and reopen the MCP client; in-place reconnect doesn't always re-spawn the child process. |
+| Wrong vault is showing up | One server instance points at one running Obsidian instance. Switch vaults inside Obsidian, or register multiple MCP entries with different names. |
+
+### From source (contributors only)
+
+If you want to hack on the server itself rather than just use it:
 
 ```bash
 git clone https://github.com/yanxue06/obsidian-mcp.git
@@ -189,7 +247,7 @@ A few of the trade-offs worth calling out, for anyone reading the code or evalua
 
 **Why does `move_note` rewrite backlinks?** Because LLMs almost always *think* they should rename, then break the graph and not notice. Making the safe path the default — and the unsafe path a `update_backlinks: false` opt-out — turns a footgun into a noop. We resolve each candidate link in the *pre-move* file list before rewriting, to avoid clobbering links that happened to share a basename.
 
-**Why no embeddings / semantic search?** Embeddings would be useful, but they require a vector store, an embedding pipeline, and incremental indexing — meaningful complexity that pulls a single-file-server into a stateful system. The plugin's full-text search covers the common case; embeddings are on the [roadmap](#roadmap) once the first-pass user feedback is in.
+**Why no embeddings / semantic search?** Embeddings would be useful, but they require a vector store, an embedding pipeline, and incremental indexing — meaningful complexity that pulls a single-file-server into a stateful system. The plugin's full-text search covers the common case; embeddings would be a meaningful next step once first-pass user feedback is in.
 
 **Why Zod schemas instead of hand-written JSON Schema?** Two-way type inference. The handler's `input` parameter is automatically typed from the schema, so refactors that change a tool's input shape produce compile errors at the call site, not runtime errors at tool-call time. The MCP SDK lowers Zod to JSON Schema for clients automatically.
 
@@ -218,24 +276,13 @@ All config is via environment variables — set them in your MCP client config.
 
 *`find_orphans` and `find_broken_links` accept a `sample_size` parameter — bound them on large vaults to keep tool calls under the model's per-call timeout.
 
-## Roadmap
-
-- [ ] Embedding-based semantic search (currently keyword-only)
-- [ ] Multi-vault routing (one server, multiple Obsidian instances)
-- [ ] Read-only safe mode (no write tools registered)
-- [ ] Transactional `move_note` with rollback on failure
-- [ ] Resource subscriptions (push updates when notes change)
-- [ ] Listing on Smithery and the official MCP server registry
-
-PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## FAQ
 
 **Do I need to install an Obsidian plugin?** Yes — the Local REST API plugin. It's the only sane way to talk to a running vault from outside. `obsidian-mcp` itself runs as a separate Node process started by your MCP client; you don't install another plugin in Obsidian for this.
 
 **Does it work if Obsidian is closed?** No. The Local REST API runs *inside* Obsidian, so the app needs to be open.
 
-**Does it support multiple vaults?** One server instance points at one running Obsidian instance. Run multiple MCP server entries (different names) if you switch vaults frequently. Multi-vault routing is on the roadmap.
+**Does it support multiple vaults?** One server instance points at one running Obsidian instance. Run multiple MCP server entries (different names) if you switch vaults frequently. Multi-vault routing may come later.
 
 **Why HTTPS by default with `OBSIDIAN_VERIFY_TLS=false`?** The plugin ships a self-signed cert. The traffic is loopback-only (`127.0.0.1`), so verification adds friction without a real security gain. If you've replaced the cert, set the flag.
 
