@@ -51,6 +51,11 @@ export class ObsidianError extends Error {
   }
 }
 
+// Hard cap so a pathological vault (or a symlink loop the plugin happens to
+// expose) can't make us walk forever. Vaults with more files than this will
+// still work — we just stop recursing once we've collected this many paths.
+const LIST_VAULT_MAX_ENTRIES = 50_000;
+
 export class ObsidianClient {
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
@@ -151,10 +156,39 @@ export class ObsidianClient {
 
   // ---------- vault ----------
 
-  /** List all files (and folders) in the vault. */
+  /**
+   * List every file in the vault, recursively.
+   *
+   * The plugin's `GET /vault/` only returns immediate children of the
+   * requested directory — folders come back with a trailing '/'. To get
+   * the full vault contents we walk the tree and prefix entries with
+   * their parent path. Without this, callers that depend on a complete
+   * file list (find_orphans, forward-link resolution, create_notes
+   * existence checks, upsert_note's `existed` flag) silently miss any
+   * note that lives inside a subfolder.
+   */
   async listVault(): Promise<string[]> {
-    const data = await this.req<{ files: string[] }>("GET", "/vault/");
-    return data.files ?? [];
+    const out: string[] = [];
+
+    const walk = async (folder: string): Promise<void> => {
+      if (out.length >= LIST_VAULT_MAX_ENTRIES) return;
+      const data = await this.req<{ files: string[] }>(
+        "GET",
+        folder ? `/vault/${encodeURIPath(folder)}/` : "/vault/",
+      );
+      for (const entry of data.files ?? []) {
+        if (out.length >= LIST_VAULT_MAX_ENTRIES) return;
+        if (entry.endsWith("/")) {
+          const sub = entry.slice(0, -1);
+          await walk(folder ? `${folder}/${sub}` : sub);
+        } else {
+          out.push(folder ? `${folder}/${entry}` : entry);
+        }
+      }
+    };
+
+    await walk("");
+    return out;
   }
 
   /** List files inside a folder (relative path, no leading slash). */
