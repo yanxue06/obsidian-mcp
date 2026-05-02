@@ -278,13 +278,22 @@ export class ObsidianClient {
    * Plain-text search across the vault.
    *
    * The plugin's `/search/simple/` endpoint takes the query as URL params
-   * with no request body. Setting Content-Type without a body causes some
-   * Node HTTP stacks (and the plugin's strict request parsing) to reject
-   * the request, so we omit the header here.
+   * with no request body. Two subtleties matter here:
+   *
+   *   1. Setting Content-Type without a body causes some Node HTTP stacks
+   *      (and the plugin's strict request parsing) to reject the request,
+   *      so we omit Content-Type entirely.
+   *   2. With no body and no Content-Length, undici defaults to
+   *      Transfer-Encoding: chunked. The plugin's handler then waits for
+   *      body bytes that never arrive, and the request hangs until our
+   *      headersTimeout (~15s) fires. Forcing Content-Length: 0 lets
+   *      undici emit a fixed-length empty body and the plugin responds
+   *      immediately.
    */
   async simpleSearch(query: string, contextLength = 100): Promise<SearchHit[]> {
     const data = await this.req<SearchHit[]>("POST", "/search/simple/", {
       query: { query, contextLength },
+      headers: { "Content-Length": "0" },
     });
     return data ?? [];
   }
