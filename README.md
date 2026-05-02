@@ -8,7 +8,7 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that gives Claude — and any other MCP-compatible AI — graph-aware access to your notes. Backlinks, multi-hop traversal, Dataview queries, daily-note awareness, batch note creation, and safe rename-with-backlink-rewrite, exposed as 25 typed tools.
 
-[![npm version](https://img.shields.io/npm/v/obsidian-mcp.svg?style=flat-square&color=cb3837)](https://www.npmjs.com/package/obsidian-mcp)
+[![npm version](https://img.shields.io/npm/v/%40yanxue06%2Fobsidian-mcp.svg?style=flat-square&color=cb3837)](https://www.npmjs.com/package/@yanxue06/obsidian-mcp)
 [![CI](https://img.shields.io/github/actions/workflow/status/yanxue06/obsidian-mcp/ci.yml?style=flat-square&label=CI)](https://github.com/yanxue06/obsidian-mcp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-7c3aed?style=flat-square)](https://modelcontextprotocol.io)
@@ -92,7 +92,7 @@ Add the `obsidian` entry under `mcpServers`:
   "mcpServers": {
     "obsidian": {
       "command": "npx",
-      "args": ["-y", "obsidian-mcp"],
+      "args": ["-y", "@yanxue06/obsidian-mcp"],
       "env": {
         "OBSIDIAN_API_KEY": "paste-your-key-here"
       }
@@ -111,7 +111,7 @@ Quit and reopen Claude Desktop. You should see a tool icon in the input area —
 Run once, from any directory:
 
 ```bash
-claude mcp add obsidian -e OBSIDIAN_API_KEY=paste-your-key-here -- npx -y obsidian-mcp
+claude mcp add obsidian -e OBSIDIAN_API_KEY=paste-your-key-here -- npx -y @yanxue06/obsidian-mcp
 ```
 
 Then fully quit and reopen Claude Code (`/mcp reconnect` doesn't always re-spawn the child process). Verify with `/mcp` — `obsidian` should report **✓ Connected**.
@@ -124,7 +124,7 @@ Then fully quit and reopen Claude Code (`/mcp reconnect` doesn't always re-spawn
 Add a new stdio MCP server with:
 
 - **Command:** `npx`
-- **Args:** `-y obsidian-mcp`
+- **Args:** `-y @yanxue06/obsidian-mcp`
 - **Env:** `OBSIDIAN_API_KEY=paste-your-key-here`
 
 Refer to your client's MCP config docs for the exact field names. Any MCP-compatible client works.
