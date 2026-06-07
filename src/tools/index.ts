@@ -1,35 +1,39 @@
 import type { AnyToolDef } from "./types.js";
-import {
-  deleteNoteTool,
-  getActiveNoteTool,
-  listVaultTool,
-} from "./vault.js";
-import {
-  appendNoteTool,
-  createNoteTool,
-  createNotesTool,
-  getNoteTool,
-  patchNoteTool,
-  updateNoteTool,
-  upsertNoteTool,
-} from "./note.js";
-import {
-  findOrphansTool,
-  queryDataviewTool,
-  searchVaultTool,
-} from "./search.js";
-import { findBrokenLinksTool, traverseGraphTool } from "./graph.js";
-import { appendDailyNoteTool, getDailyNoteTool } from "./periodic.js";
-import { getOutlineTool } from "./outline.js";
-import { getBacklinksTool } from "./backlinks.js";
-import { listTagsTool } from "./tags.js";
-import { moveNoteTool } from "./move.js";
-import {
-  listCommandsTool,
-  openNoteTool,
-  runCommandTool,
-} from "./commands.js";
-import { getVaultStatsTool } from "./stats.js";
+
+// discovery — find what's in the vault
+import { listVaultTool } from "./discovery/list_vault.js";
+import { searchVaultTool } from "./discovery/search_vault.js";
+import { queryDataviewTool } from "./discovery/query_dataview.js";
+import { listTagsTool } from "./discovery/list_tags.js";
+import { getVaultStatsTool } from "./discovery/get_vault_stats.js";
+
+// reading — get content out
+import { getNoteTool } from "./reading/get_note.js";
+import { getOutlineTool } from "./reading/get_outline.js";
+import { getActiveNoteTool } from "./reading/get_active_note.js";
+import { getDailyNoteTool } from "./reading/get_daily_note.js";
+
+// graph — walk and analyze the link structure
+import { getBacklinksTool } from "./graph/get_backlinks.js";
+import { traverseGraphTool } from "./graph/traverse_graph.js";
+import { findOrphansTool } from "./graph/find_orphans.js";
+import { findBrokenLinksTool } from "./graph/find_broken_links.js";
+
+// writing — create and modify notes
+import { createNoteTool } from "./writing/create_note.js";
+import { createNotesTool } from "./writing/create_notes.js";
+import { upsertNoteTool } from "./writing/upsert_note.js";
+import { updateNoteTool } from "./writing/update_note.js";
+import { appendNoteTool } from "./writing/append_to_note.js";
+import { appendDailyNoteTool } from "./writing/append_to_daily_note.js";
+import { patchNoteTool } from "./writing/patch_note.js";
+import { moveNoteTool } from "./writing/move_note.js";
+import { deleteNoteTool } from "./writing/delete_note.js";
+
+// commands — drive Obsidian itself
+import { openNoteTool } from "./commands/open_note.js";
+import { listCommandsTool } from "./commands/list_commands.js";
+import { runCommandTool } from "./commands/run_command.js";
 
 export const allTools: AnyToolDef[] = [
   // discovery
@@ -58,7 +62,7 @@ export const allTools: AnyToolDef[] = [
   patchNoteTool,
   moveNoteTool,
   deleteNoteTool,
-  // ui / commands
+  // commands
   openNoteTool,
   listCommandsTool,
   runCommandTool,

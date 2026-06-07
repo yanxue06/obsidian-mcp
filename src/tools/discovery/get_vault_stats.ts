@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { defineTool } from "./types.js";
-import { getAllFiles } from "../cache.js";
-import { countWords, dirname, isMarkdown } from "../graph.js";
+import { defineTool } from "../types.js";
+import { getAllFiles } from "../../core/cache.js";
+import { dirname, isMarkdown } from "../../core/paths.js";
+import { countWords } from "../../core/markdown.js";
 
 export const getVaultStatsTool = defineTool({
   name: "get_vault_stats",
@@ -43,7 +44,7 @@ export const getVaultStatsTool = defineTool({
     if (sample_size > 0) {
       const subset = md.slice(0, sample_size);
       sampled = subset.length;
-      // Concurrent fetch in small batches to avoid hammering the plugin.
+      // Fetch in small concurrent batches to avoid hammering the plugin.
       const BATCH = 8;
       for (let i = 0; i < subset.length; i += BATCH) {
         const slice = subset.slice(i, i + BATCH);

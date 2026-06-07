@@ -1,18 +1,27 @@
 /**
  * Thin client over the Obsidian Local REST API plugin.
- *
  * Plugin: https://github.com/coddingtonbear/obsidian-local-rest-api
  *
- * The plugin defaults to:
- *   - HTTPS on port 27124 with a self-signed cert
- *   - HTTP  on port 27123 (must be explicitly enabled)
+ * The plugin defaults to HTTPS on port 27124 with a self-signed cert (HTTP on
+ * 27123 must be explicitly enabled). We use `undici` rather than Node's `https`
+ * so we can opt out of TLS verification for that self-signed cert without
+ * leaking the choice into other dependencies.
  *
- * We do not import `fs`/Node's `https` directly; instead we use `undici` so
- * we can opt out of TLS verification (the self-signed cert) without leaking
- * that choice into other dependencies.
+ * Methods are grouped by REST resource (vault / search / periodic / active /
+ * commands / open). This is one cohesive client for one API — kept in a single
+ * file on purpose; the section dividers are the map.
  */
 import { Agent, request } from "undici";
 import { configBaseUrl, type Config } from "./config.js";
+
+export const PERIODS = [
+  "daily",
+  "weekly",
+  "monthly",
+  "quarterly",
+  "yearly",
+] as const;
+export type Period = (typeof PERIODS)[number];
 
 export interface NoteMeta {
   path: string;
@@ -51,9 +60,8 @@ export class ObsidianError extends Error {
   }
 }
 
-// Hard cap so a pathological vault (or a symlink loop the plugin happens to
-// expose) can't make us walk forever. Vaults with more files than this will
-// still work — we just stop recursing once we've collected this many paths.
+// Hard cap so a pathological vault (or a symlink loop the plugin exposes) can't
+// make us walk forever. Larger vaults still work — we stop collecting here.
 const LIST_VAULT_MAX_ENTRIES = 50_000;
 
 export class ObsidianClient {
@@ -70,12 +78,10 @@ export class ObsidianClient {
     };
     this.timeoutMs = config.timeoutMs;
     this.dispatcher = new Agent({
-      connect: {
-        // The plugin ships a self-signed cert by default. Opting out is the
-        // recommended path; users who terminate TLS elsewhere can flip
-        // OBSIDIAN_VERIFY_TLS=true.
-        rejectUnauthorized: config.verifyTls,
-      },
+      // The plugin ships a self-signed cert by default; opting out is the
+      // recommended path. Users who terminate TLS elsewhere set
+      // OBSIDIAN_VERIFY_TLS=true.
+      connect: { rejectUnauthorized: config.verifyTls },
     });
   }
 
@@ -139,14 +145,12 @@ export class ObsidianClient {
     }
 
     if (init?.expect === "empty" || status === 204) {
-      // Drain body so the connection can be reused.
-      await res.body.dump();
+      await res.body.dump(); // drain so the connection can be reused
       return undefined as T;
     }
     if (init?.expect === "text") {
       return (await res.body.text()) as unknown as T;
     }
-    // Default: try JSON, fall back to text.
     const ct = res.headers["content-type"];
     const isJson =
       typeof ct === "string" && ct.toLowerCase().includes("application/json");
@@ -159,13 +163,11 @@ export class ObsidianClient {
   /**
    * List every file in the vault, recursively.
    *
-   * The plugin's `GET /vault/` only returns immediate children of the
-   * requested directory — folders come back with a trailing '/'. To get
-   * the full vault contents we walk the tree and prefix entries with
-   * their parent path. Without this, callers that depend on a complete
-   * file list (find_orphans, forward-link resolution, create_notes
-   * existence checks, upsert_note's `existed` flag) silently miss any
-   * note that lives inside a subfolder.
+   * The plugin's `GET /vault/` only returns immediate children (folders come
+   * back with a trailing '/'), so we walk the tree ourselves and prefix each
+   * entry with its parent path. Without this, anything that depends on a
+   * complete file list (find_orphans, link resolution, create_notes existence
+   * checks, upsert's `existed` flag) silently misses notes in subfolders.
    */
   async listVault(): Promise<string[]> {
     const out: string[] = [];
@@ -247,10 +249,7 @@ export class ObsidianClient {
     });
   }
 
-  /**
-   * Patch a note (insert content relative to a heading, block, or frontmatter
-   * field). See plugin docs for the full PATCH semantics.
-   */
+  /** Patch a note relative to a heading, block, or frontmatter field. */
   async patchNote(
     path: string,
     body: string,
@@ -277,18 +276,12 @@ export class ObsidianClient {
   /**
    * Plain-text search across the vault.
    *
-   * The plugin's `/search/simple/` endpoint takes the query as URL params
-   * with no request body. Two subtleties matter here:
-   *
-   *   1. Setting Content-Type without a body causes some Node HTTP stacks
-   *      (and the plugin's strict request parsing) to reject the request,
-   *      so we omit Content-Type entirely.
-   *   2. With no body and no Content-Length, undici defaults to
-   *      Transfer-Encoding: chunked. The plugin's handler then waits for
-   *      body bytes that never arrive, and the request hangs until our
-   *      headersTimeout (~15s) fires. Forcing Content-Length: 0 lets
-   *      undici emit a fixed-length empty body and the plugin responds
-   *      immediately.
+   * The plugin's `/search/simple/` takes the query as URL params with no body.
+   * Two subtleties: (1) sending Content-Type without a body trips the plugin's
+   * strict request parsing, so we omit it; (2) with no body and no
+   * Content-Length, undici defaults to chunked encoding and the plugin then
+   * waits for body bytes that never arrive — hanging until our timeout. Forcing
+   * `Content-Length: 0` makes undici emit a fixed-length empty body instead.
    */
   async simpleSearch(query: string, contextLength = 100): Promise<SearchHit[]> {
     const data = await this.req<SearchHit[]>("POST", "/search/simple/", {
@@ -318,9 +311,7 @@ export class ObsidianClient {
 
   // ---------- periodic notes ----------
 
-  async getPeriodic(
-    period: "daily" | "weekly" | "monthly" | "quarterly" | "yearly",
-  ): Promise<NoteContent> {
+  async getPeriodic(period: Period): Promise<NoteContent> {
     const data = await this.req<NoteContent | string>(
       "GET",
       `/periodic/${period}/`,
@@ -330,10 +321,7 @@ export class ObsidianClient {
     return data as NoteContent;
   }
 
-  async appendPeriodic(
-    period: "daily" | "weekly" | "monthly" | "quarterly" | "yearly",
-    content: string,
-  ): Promise<void> {
+  async appendPeriodic(period: Period, content: string): Promise<void> {
     await this.req("POST", `/periodic/${period}/`, {
       body: content,
       headers: { "Content-Type": "text/markdown" },
@@ -390,8 +378,8 @@ export class ObsidianClient {
 }
 
 /**
- * Encode a vault-relative path while preserving "/" separators.
- * The plugin treats path components as URL-encoded segments.
+ * Encode a vault-relative path while preserving "/" separators — the plugin
+ * treats each path component as a URL-encoded segment.
  */
 export function encodeURIPath(p: string): string {
   return p

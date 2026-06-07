@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildNoteBody } from "./note.js";
+import { buildNoteBody } from "../../src/core/note-body.js";
 
 test("buildNoteBody — content only, no frontmatter or links", () => {
   const out = buildNoteBody({ content: "hello" });
@@ -17,10 +17,7 @@ test("buildNoteBody — frontmatter renders YAML block before content", () => {
     content: "body",
     frontmatter: { title: "Foo", tags: ["a", "b"] },
   });
-  assert.equal(
-    out,
-    "---\ntitle: Foo\ntags:\n  - a\n  - b\n---\n\nbody",
-  );
+  assert.equal(out, "---\ntitle: Foo\ntags:\n  - a\n  - b\n---\n\nbody");
 });
 
 test("buildNoteBody — empty frontmatter object is skipped", () => {

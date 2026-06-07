@@ -1,11 +1,11 @@
 /**
- * In-memory cache for the vault file list.
+ * Short-TTL cache of the vault's file list.
  *
- * `listVault` is the most-called endpoint (every link resolution and graph
- * walk needs the canonical file list). We cache it for a short TTL so chains
- * of agent tool calls don't hammer Obsidian.
+ * `listVault` backs every link resolution and graph walk, so a chain of agent
+ * tool calls would otherwise hammer Obsidian for the same listing. Writes
+ * invalidate the cache so freshly created/moved/deleted notes show up.
  */
-import type { ObsidianClient } from "./obsidian.js";
+import type { ObsidianClient } from "../client/obsidian.js";
 
 const TTL_MS = 30_000;
 

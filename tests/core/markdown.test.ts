@@ -1,23 +1,12 @@
-/**
- * Pure-logic tests. Run with `node --import tsx src/graph.test.ts` for dev,
- * or via `npm test` against the compiled output.
- *
- * We deliberately avoid an extra test framework dependency — Node's built-in
- * `node:test` is sufficient for the surface we care about (graph parsing).
- */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  basename,
   countWords,
-  dirname,
-  isMarkdown,
   parseHeadings,
   parseLinks,
   parseTags,
-  resolveLink,
   stripCode,
-} from "./graph.js";
+} from "../../src/core/markdown.js";
 
 test("parseLinks: simple wiki-link", () => {
   const links = parseLinks("Hello [[World]] and [[Other Note]].");
@@ -73,33 +62,8 @@ test("parseTags: ignores tags in code", () => {
 });
 
 test("parseTags: does not match #1 (numeric only) — Obsidian convention", () => {
-  // Obsidian requires a tag to start with a letter/underscore.
   const tags = parseTags("issue #123 closed");
   assert.equal(tags.length, 0);
-});
-
-test("resolveLink: finds by basename", () => {
-  const files = ["folder/A.md", "other/B.md"];
-  assert.equal(resolveLink("A", files), "folder/A.md");
-  assert.equal(resolveLink("a", files), "folder/A.md");
-});
-
-test("resolveLink: prefers explicit path", () => {
-  const files = ["a/Note.md", "b/Note.md"];
-  assert.equal(resolveLink("b/Note", files), "b/Note.md");
-});
-
-test("resolveLink: returns null when missing", () => {
-  assert.equal(resolveLink("Nope", ["A.md"]), null);
-});
-
-test("basename / dirname / isMarkdown", () => {
-  assert.equal(basename("a/b/c.md"), "c.md");
-  assert.equal(dirname("a/b/c.md"), "a/b");
-  assert.equal(dirname("c.md"), "");
-  assert.ok(isMarkdown("a.md"));
-  assert.ok(isMarkdown("a.MARKDOWN"));
-  assert.ok(!isMarkdown("a.png"));
 });
 
 test("stripCode removes fences and inline code", () => {
@@ -130,6 +94,5 @@ test("parseHeadings extracts ATX headings", () => {
 test("countWords approximates", () => {
   assert.equal(countWords("hello world"), 2);
   assert.equal(countWords("# Heading\nfour words here exactly"), 5);
-  // The fenced/inline code is stripped before counting; "does not count" remains.
   assert.equal(countWords("`stripped` does not count"), 3);
 });

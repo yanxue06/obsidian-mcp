@@ -1,0 +1,10 @@
+{
+  // Type-checks src + tests together without emitting — the build
+  // (tsconfig.json) only compiles src into dist; tests run via tsx.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineTool } from "./types.js";
-import { basename, isMarkdown } from "../graph.js";
+import { defineTool } from "../types.js";
+import { basename, isMarkdown } from "../../core/paths.js";
 
 export const getBacklinksTool = defineTool({
   name: "get_backlinks",

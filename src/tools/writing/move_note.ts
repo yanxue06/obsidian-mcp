@@ -1,16 +1,13 @@
 import { z } from "zod";
-import { defineTool } from "./types.js";
-import { getAllFiles, invalidateFileCache } from "../cache.js";
-import { basename, isMarkdown, parseLinks, resolveLink } from "../graph.js";
+import { defineTool } from "../types.js";
+import { getAllFiles, invalidateFileCache } from "../../core/cache.js";
+import { basename, isMarkdown, resolveLink } from "../../core/paths.js";
 
 /**
- * The Local REST API plugin does not expose a rename/move endpoint, so we
- * implement it client-side: read the source, write to the destination,
- * delete the source. Optionally rewrite incoming wiki-links so the rename
- * doesn't break the graph.
- *
- * Rewriting backlinks scans every note that links to the source. We use
- * the search index to find them quickly, then patch each match in place.
+ * The Local REST API has no rename/move endpoint, so we implement it
+ * client-side: read the source, write the destination, optionally rewrite
+ * incoming wiki-links so the rename doesn't break the graph, then delete the
+ * source. Backlinks are found via the search index and patched in place.
  */
 export const moveNoteTool = defineTool({
   name: "move_note",
@@ -42,15 +39,11 @@ export const moveNoteTool = defineTool({
       );
     }
 
-    // 1. Read source.
     const content = await client.getNoteText(from);
-
-    // 2. Write destination.
     await client.putNote(dest, content);
 
-    // 3. Update backlinks.
     let backlinks_updated = 0;
-    let edits: Array<{ note: string; replaced: number }> = [];
+    const edits: Array<{ note: string; replaced: number }> = [];
     if (update_backlinks) {
       const oldStem = basename(from).replace(/\.md$/i, "");
       const newStem = basename(dest).replace(/\.md$/i, "");
@@ -66,7 +59,6 @@ export const moveNoteTool = defineTool({
         }
         const { replaced, body: rewritten } = rewriteWikiLinks(
           body,
-          oldStem,
           newStem,
           all,
           from,
@@ -79,7 +71,6 @@ export const moveNoteTool = defineTool({
       }
     }
 
-    // 4. Delete source.
     await client.deleteNote(from);
     invalidateFileCache();
 
@@ -96,43 +87,31 @@ export const moveNoteTool = defineTool({
 
 /**
  * Rewrite `[[oldStem...]]` → `[[newStem...]]` only where the link actually
- * resolved to the file being moved. Preserves aliases and headings.
+ * resolved to the file being moved (using the pre-move file list, so two notes
+ * sharing a basename don't cause false positives). Aliases and headings are
+ * preserved.
  */
 function rewriteWikiLinks(
   body: string,
-  oldStem: string,
   newStem: string,
   allFiles: string[],
   movedPath: string,
 ): { body: string; replaced: number } {
   let replaced = 0;
-  const out = body.replace(
-    /\[\[([^\]\n]+)\]\]/g,
-    (full, inner: string) => {
-      // inner = "Target#Heading|Alias" — split it carefully.
-      const pipe = inner.indexOf("|");
-      const aliasPart = pipe >= 0 ? inner.slice(pipe) : "";
-      const beforeAlias = pipe >= 0 ? inner.slice(0, pipe) : inner;
-      const hash = beforeAlias.indexOf("#");
-      const targetPart = hash >= 0 ? beforeAlias.slice(0, hash) : beforeAlias;
-      const trailing = hash >= 0 ? beforeAlias.slice(hash) : "";
+  const out = body.replace(/\[\[([^\]\n]+)\]\]/g, (full, inner: string) => {
+    // inner = "Target#Heading|Alias" — split it carefully.
+    const pipe = inner.indexOf("|");
+    const aliasPart = pipe >= 0 ? inner.slice(pipe) : "";
+    const beforeAlias = pipe >= 0 ? inner.slice(0, pipe) : inner;
+    const hash = beforeAlias.indexOf("#");
+    const targetPart = hash >= 0 ? beforeAlias.slice(0, hash) : beforeAlias;
+    const trailing = hash >= 0 ? beforeAlias.slice(hash) : "";
 
-      const trimmed = targetPart.trim();
-      // Resolve in the (pre-move) file list to ensure this link actually
-      // pointed at the moved file. Avoids false positives where two notes
-      // share a basename.
-      const resolved = resolveLink(trimmed, allFiles);
-      if (resolved !== movedPath) return full;
+    const trimmed = targetPart.trim();
+    if (resolveLink(trimmed, allFiles) !== movedPath) return full;
 
-      // Preserve whether the original used a path or a basename.
-      const isPath = trimmed.includes("/");
-      const newTarget = isPath
-        ? newStem // path-style links re-resolve by path; new basename suffices
-        : newStem;
-
-      replaced++;
-      return `[[${newTarget}${trailing}${aliasPart}]]`;
-    },
-  );
+    replaced++;
+    return `[[${newStem}${trailing}${aliasPart}]]`;
+  });
   return { body: out, replaced };
 }

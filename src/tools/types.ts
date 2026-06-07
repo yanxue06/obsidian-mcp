@@ -1,14 +1,13 @@
 import { z, type ZodRawShape } from "zod";
-import type { ObsidianClient } from "../obsidian.js";
+import type { ObsidianClient } from "../client/obsidian.js";
 
 export interface ToolContext {
   client: ObsidianClient;
 }
 
 /**
- * Internal tool descriptor. We keep schemas as Zod object schemas (so we
- * can call `.shape` for the MCP SDK) and infer handler input types from
- * them at compile time.
+ * Internal tool descriptor. Schemas are Zod object schemas (so we can hand
+ * `.shape` to the MCP SDK) and handler input types are inferred from them.
  */
 export interface ToolDef<TShape extends ZodRawShape = ZodRawShape> {
   name: string;
@@ -22,9 +21,8 @@ export interface ToolDef<TShape extends ZodRawShape = ZodRawShape> {
 }
 
 /**
- * Type-erased tool. Used in arrays so a heterogeneous list of tools with
- * different input shapes can live in a single export without TypeScript
- * complaining about handler variance.
+ * Type-erased tool, so a heterogeneous list of tools with different input
+ * shapes can live in one array without TypeScript complaining about variance.
  */
 export interface AnyToolDef {
   name: string;

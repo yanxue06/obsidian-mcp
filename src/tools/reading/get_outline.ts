@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineTool } from "./types.js";
-import { parseHeadings } from "../graph.js";
+import { defineTool } from "../types.js";
+import { parseHeadings } from "../../core/markdown.js";
 
 export const getOutlineTool = defineTool({
   name: "get_outline",
