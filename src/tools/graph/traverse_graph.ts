@@ -1,17 +1,13 @@
 import { z } from "zod";
-import { defineTool } from "./types.js";
-import { getAllFiles } from "../cache.js";
-import {
-  basename,
-  isMarkdown,
-  parseLinks,
-  resolveLink,
-} from "../graph.js";
+import { defineTool } from "../types.js";
+import { getAllFiles } from "../../core/cache.js";
+import { basename, isMarkdown, resolveLink } from "../../core/paths.js";
+import { parseLinks } from "../../core/markdown.js";
 
 /**
- * Walk the vault graph. This is the differentiating tool — most Obsidian
- * MCP servers expose only file CRUD; we let the LLM ask "give me everything
- * within 2 hops of this note" in a single call.
+ * The differentiating tool — most Obsidian MCP servers expose only file CRUD;
+ * we let the model ask "give me everything within N hops of this note" in a
+ * single call.
  */
 export const traverseGraphTool = defineTool({
   name: "traverse_graph",
@@ -53,7 +49,7 @@ export const traverseGraphTool = defineTool({
         body = await client.getNoteText(path);
         if (include_snippets) snippet = body.slice(0, 200);
       } catch {
-        // Note may not exist (broken link target); record it but don't expand.
+        // Note may not exist (broken link target); record it, don't expand.
         visited.set(path, { depth: d });
         continue;
       }
@@ -97,48 +93,6 @@ export const traverseGraphTool = defineTool({
         snippet: v.snippet,
       })),
       edges,
-    };
-  },
-});
-
-export const findBrokenLinksTool = defineTool({
-  name: "find_broken_links",
-  title: "Find broken links",
-  description:
-    "Find wiki-links and markdown links that don't resolve to any note in the vault. Use for vault hygiene or before refactoring note titles.",
-  inputSchema: z.object({
-    folder: z.string().optional(),
-    limit: z.number().int().positive().max(500).default(100),
-    sample_size: z.number().int().positive().max(2000).default(300),
-  }),
-  async handler({ folder, limit, sample_size }, { client }) {
-    const all = (await getAllFiles(client)).filter(isMarkdown);
-    const scope = folder
-      ? all.filter((f) => f.startsWith(folder.replace(/\/+$/g, "") + "/"))
-      : all;
-    const sample = scope.slice(0, sample_size);
-
-    const broken: Array<{ source: string; target: string }> = [];
-    for (const path of sample) {
-      let body: string;
-      try {
-        body = await client.getNoteText(path);
-      } catch {
-        continue;
-      }
-      for (const link of parseLinks(body)) {
-        if (!resolveLink(link.target, all)) {
-          broken.push({ source: path, target: link.target });
-          if (broken.length >= limit) break;
-        }
-      }
-      if (broken.length >= limit) break;
-    }
-
-    return {
-      scanned: sample.length,
-      broken_count: broken.length,
-      broken,
     };
   },
 });

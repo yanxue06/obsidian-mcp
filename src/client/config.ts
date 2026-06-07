@@ -2,15 +2,14 @@
  * Configuration loaded from environment variables.
  *
  * Required:
- *   OBSIDIAN_API_KEY        - Bearer token from the Local REST API plugin.
- *
+ *   OBSIDIAN_API_KEY     Bearer token from the Local REST API plugin.
  * Optional:
- *   OBSIDIAN_HOST           - default: 127.0.0.1
- *   OBSIDIAN_PORT           - default: 27124 (HTTPS) or 27123 (HTTP)
- *   OBSIDIAN_PROTOCOL       - "https" (default) or "http"
- *   OBSIDIAN_VERIFY_TLS     - "true" | "false" (default: false; the plugin
- *                             ships a self-signed cert).
- *   OBSIDIAN_TIMEOUT_MS     - default: 15000
+ *   OBSIDIAN_HOST        default 127.0.0.1
+ *   OBSIDIAN_PORT        default 27124 (https) / 27123 (http)
+ *   OBSIDIAN_PROTOCOL    "https" (default) | "http"
+ *   OBSIDIAN_VERIFY_TLS  "true" | "false" (default false — plugin ships a
+ *                        self-signed cert)
+ *   OBSIDIAN_TIMEOUT_MS  default 15000
  */
 export interface Config {
   apiKey: string;

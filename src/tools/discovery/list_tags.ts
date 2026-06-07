@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { defineTool } from "./types.js";
-import { getAllFiles } from "../cache.js";
-import { isMarkdown, parseTags } from "../graph.js";
+import { defineTool } from "../types.js";
+import { getAllFiles } from "../../core/cache.js";
+import { isMarkdown } from "../../core/paths.js";
+import { parseTags } from "../../core/markdown.js";
 
 /**
- * Vault-wide tag inventory. The Local REST API doesn't expose a tags
- * endpoint, so we scan a sample of notes ourselves. Frontmatter tags are
- * picked up via `getNote`'s metadata channel; inline `#tag` tags via the
- * markdown body.
+ * Vault-wide tag inventory. The Local REST API has no tags endpoint, so we
+ * scan a sample of notes — picking up frontmatter tags from `getNote`'s
+ * metadata and inline `#tag`s from the body.
  */
 export const listTagsTool = defineTool({
   name: "list_tags",

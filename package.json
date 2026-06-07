@@ -43,8 +43,8 @@
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build && npm test",
-    "lint": "tsc --noEmit",
-    "test": "tsc && node --test dist/graph.test.js dist/tools/note.test.js",
+    "lint": "tsc -p tsconfig.test.json",
+    "test": "node --import tsx --test tests/core/markdown.test.ts tests/core/paths.test.ts tests/core/note-body.test.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
   "engines": {
