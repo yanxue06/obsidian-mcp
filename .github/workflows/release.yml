@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   release:
-    uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@v1
+    uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@main
     with:
       service-name: "@yanxue06/obsidian-mcp"
       use-oidc: true
