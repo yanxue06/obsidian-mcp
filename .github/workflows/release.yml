@@ -25,6 +25,7 @@ jobs:
     uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@v1
     with:
       service-name: "@yanxue06/obsidian-mcp"
+      use-oidc: true
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
