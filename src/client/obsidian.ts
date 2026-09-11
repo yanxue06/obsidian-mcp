@@ -263,6 +263,12 @@ export class ObsidianClient {
       body,
       headers: {
         "Content-Type": "text/markdown",
+        // Local REST API plugin >=4.x supports two incompatible PATCH header
+        // formats and refuses to guess between them without this header. We
+        // send the 1.x-style Operation/Target-Type/Target headers below, so
+        // this must stay "1" unless this client is rewritten to use the v2
+        // raw-content format instead.
+        "Markdown-Patch-Version": "1",
         Operation: headers.operation,
         "Target-Type": headers.targetType,
         Target: headers.target,
